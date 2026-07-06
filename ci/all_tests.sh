@@ -267,13 +267,17 @@ create_native_bundle() {
   )
 }
 
-copy_examples_for_package_url() {
-  local package_url=$1
+copy_examples_for_platform_ref() {
+  local platform_ref=$1
   local dest_dir=$2
+  local escaped_ref
+  escaped_ref=${platform_ref//\\/\\\\}
+  escaped_ref=${escaped_ref//&/\\&}
+  escaped_ref=${escaped_ref//|/\\|}
 
   mkdir -p "$dest_dir"
   for example in ./examples/*.roc; do
-    sed -E "s|platform \"[^\"]+\"|platform \"$package_url\"|g" "$example" > "$dest_dir/$(basename "$example")"
+    sed -E "s|platform \"[^\"]+\"|platform \"$escaped_ref\"|g" "$example" > "$dest_dir/$(basename "$example")"
   done
 }
 
@@ -349,7 +353,7 @@ run_bundle_suite() {
   echo "Package URL: $package_url"
 
   local package_examples_dir="$temp_root/examples"
-  copy_examples_for_package_url "$package_url" "$package_examples_dir"
+  copy_examples_for_platform_ref "$package_url" "$package_examples_dir"
   run_suite "$package_examples_dir" "$package_examples_dir" "bundled package"
 }
 
@@ -364,7 +368,15 @@ if [ "${RUN_LOCAL_TESTS:-1}" = "1" ]; then
     echo "=== Skipping platform build (SKIP_BUILD=1) ==="
   fi
 
-  run_suite "./examples" "." "local platform"
+  temp_root=""
+  temp_parent="${TMPDIR:-/tmp}"
+  temp_parent="${temp_parent%/}"
+  temp_root=$(mktemp -d "$temp_parent/platform-template-local-tests.XXXXXX")
+  TEMP_DIRS+=("$temp_root")
+
+  local_examples_dir="$temp_root/examples"
+  copy_examples_for_platform_ref "$(pwd)/platform/main.roc" "$local_examples_dir"
+  run_suite "$local_examples_dir" "$local_examples_dir" "local platform"
 else
   echo ""
   echo "=== Skipping local platform tests (RUN_LOCAL_TESTS=0) ==="

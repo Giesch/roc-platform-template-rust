@@ -14,12 +14,10 @@ A template for building [Roc platforms](https://www.roc-lang.org/platforms) usin
 
 ## Examples
 
-The examples in this repo use the local platform at `../platform/main.roc`.
+The examples in this repo use the latest release bundle:
 
-For apps outside this repo, build a bundle from this checkout and use that generated bundle URL or file path as the platform dependency. The latest published release bundle may not match the current platform API.
-
-```bash
-./bundle.sh
+```roc
+app [main!] { pf: platform "https://github.com/lukewilliamboswell/roc-platform-template-rust/releases/download/1.0.0/Bu7FVf57VbTwUrUSumuTmQNMJLLmGBmer6L5AarS4qnV.tar.zst" }
 ```
 
 Run examples with interpreter: `roc examples/<name>.roc`
@@ -70,7 +68,7 @@ This creates a `.tar.zst` bundle containing all `.roc` files and prebuilt host l
 bash ci/all_tests.sh
 ```
 
-This builds the platform and runs all examples using `roc` from your local `PATH`.
+This builds the platform and runs all examples using `roc` from your local `PATH`. For the local-platform pass, the script copies the examples to a temp directory and rewrites their release bundle dependency to this checkout's `platform/main.roc`.
 
 The script also creates a native-target platform bundle, serves it over localhost, rewrites temporary copies of the examples to use that package URL, and runs the examples again against the bundled package.
 
