@@ -2,7 +2,7 @@
 target/
 generated-docs/
 
-# Roc source (built from pinned commit in CI)
+# Local Roc source checkouts
 roc-src/
 
 # Platform binaries (but not musl runtime files)

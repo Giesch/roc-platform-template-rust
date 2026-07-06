@@ -5,7 +5,7 @@ A template for building [Roc platforms](https://www.roc-lang.org/platforms) usin
 ## Requirements
 
 - [Rust](https://rustup.rs/) (stable)
-- [Roc](https://www.roc-lang.org/) (built from the commit pinned in `.roc-version`)
+- [Roc](https://www.roc-lang.org/) on `PATH`
 
 ## Examples
 
@@ -53,7 +53,7 @@ This creates a `.tar.zst` bundle containing all `.roc` files and prebuilt host l
 bash ci/all_tests.sh
 ```
 
-This builds the platform and runs all examples. If `roc` is already on your PATH at the pinned commit, it will be used directly; otherwise it will be built from source.
+This builds the platform and runs all examples using `roc` from your local `PATH`.
 
 The script also creates a native-target platform bundle, serves it over localhost, rewrites temporary copies of the examples to use that package URL, and runs the examples again against the bundled package.
 

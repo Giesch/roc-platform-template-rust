@@ -38,31 +38,10 @@ jobs:
         with:
           targets: x86_64-apple-darwin,aarch64-apple-darwin,x86_64-unknown-linux-musl,aarch64-unknown-linux-musl
 
-      - name: Build Roc from pinned commit
-        run: |
-          echo "Building roc from pinned commit..."
-          ROC_COMMIT=$(python3 ci/get_roc_commit.py)
-
-          git init roc-src
-          cd roc-src
-          git remote add origin https://github.com/roc-lang/roc
-          git fetch --depth 1 origin "$ROC_COMMIT"
-          git checkout --detach "$ROC_COMMIT"
-
-          for attempt in 1 2 3; do
-            echo "zig build roc (attempt $attempt)..."
-            if zig build roc; then
-              break
-            fi
-            if [ $attempt -eq 3 ]; then
-              echo "zig build roc failed after 3 attempts"
-              exit 1
-            fi
-            echo "Retrying in 10 seconds..."
-            sleep 10
-          done
-
-          echo "$(pwd)/zig-out/bin" >> "$GITHUB_PATH"
+      - name: Install Roc nightly
+        uses: roc-lang/setup-roc@cbe782d6f165b89c87d99f50a59ac4f5f73b4427
+        with:
+          version: nightly-new-compiler
 
       - name: Build platform for all targets
         run: ./build.sh --all
@@ -123,31 +102,10 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Build Roc from pinned commit
-        run: |
-          echo "Building roc from pinned commit..."
-          ROC_COMMIT=$(python3 ci/get_roc_commit.py)
-
-          git init roc-src
-          cd roc-src
-          git remote add origin https://github.com/roc-lang/roc
-          git fetch --depth 1 origin "$ROC_COMMIT"
-          git checkout --detach "$ROC_COMMIT"
-
-          for attempt in 1 2 3; do
-            echo "zig build roc (attempt $attempt)..."
-            if zig build roc; then
-              break
-            fi
-            if [ $attempt -eq 3 ]; then
-              echo "zig build roc failed after 3 attempts"
-              exit 1
-            fi
-            echo "Retrying in 10 seconds..."
-            sleep 10
-          done
-
-          echo "$(pwd)/zig-out/bin" >> "$GITHUB_PATH"
+      - name: Install Roc nightly
+        uses: roc-lang/setup-roc@cbe782d6f165b89c87d99f50a59ac4f5f73b4427
+        with:
+          version: nightly-new-compiler
 
       - name: Download bundle artifact
         uses: actions/download-artifact@v4
@@ -209,14 +167,12 @@ jobs:
             exit 1
           fi
 
-          ROC_COMMIT=$(python3 ci/get_roc_commit.py | cut -c1-8)
-
           # Create release with auto-generated notes
           gh release create "${{ github.event.inputs.release_tag }}" \
             "$BUNDLE_FILE" \
             --title "${{ github.event.inputs.release_tag }}" \
             --generate-notes \
-            --notes "Platform bundle built with Rust (stable) and Roc $ROC_COMMIT"
+            --notes "Platform bundle built with Rust (stable) and Roc nightly"
 
           echo "Release created: ${{ github.event.inputs.release_tag }}"
           echo "Bundle uploaded: $BUNDLE_FILE"
