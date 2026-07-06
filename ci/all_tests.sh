@@ -247,6 +247,7 @@ create_native_bundle() {
   mkdir -p "$platform_dir"
 
   cp platform/Stderr.roc "$platform_dir/"
+  cp platform/Host.roc "$platform_dir/"
   cp platform/Stdin.roc "$platform_dir/"
   cp platform/Stdout.roc "$platform_dir/"
   write_native_target_platform_main "$native_target" "$platform_dir/main.roc"
