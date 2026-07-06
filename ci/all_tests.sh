@@ -21,76 +21,14 @@ cleanup() {
 trap 'cleanup; exit 130' INT
 trap 'cleanup; exit 143' TERM
 
-# Get the roc commit pinned in .roc-version
-ROC_COMMIT=$(python3 ci/get_roc_commit.py)
-ROC_COMMIT_SHORT="${ROC_COMMIT:0:8}"
+if ! command -v roc >/dev/null 2>&1; then
+  echo "Error: roc not found in PATH. Install Roc or add it to PATH before running ci/all_tests.sh." >&2
+  exit 1
+fi
 
 echo "=== Roc Platform Template (Rust) CI ==="
 echo ""
-
-# Check if roc is already on PATH and matches pinned commit
-NEED_BUILD=true
-if command -v roc &>/dev/null; then
-  SYSTEM_VERSION=$(roc version 2>/dev/null || echo "unknown")
-  if echo "$SYSTEM_VERSION" | grep -q "$ROC_COMMIT_SHORT"; then
-    echo "roc on PATH matches pinned commit: $SYSTEM_VERSION"
-    NEED_BUILD=false
-  else
-    echo "roc on PATH ($SYSTEM_VERSION) doesn't match pinned commit ($ROC_COMMIT_SHORT)"
-  fi
-fi
-
-# Check cached build in roc-src/
-if [ "$NEED_BUILD" = true ] && [ -d "roc-src" ] && [ -f "roc-src/zig-out/bin/roc" ]; then
-  CACHED_VERSION=$(./roc-src/zig-out/bin/roc version 2>/dev/null || echo "unknown")
-  if echo "$CACHED_VERSION" | grep -q "$ROC_COMMIT_SHORT"; then
-    echo "roc in roc-src/ matches pinned commit: $CACHED_VERSION"
-    NEED_BUILD=false
-  else
-    echo "Cached roc ($CACHED_VERSION) doesn't match pinned commit ($ROC_COMMIT_SHORT)"
-    echo "Removing stale roc-src..."
-    rm -rf roc-src
-  fi
-fi
-
-# Build from source if no matching roc found
-if [ "$NEED_BUILD" = true ]; then
-  echo "Building roc from pinned commit $ROC_COMMIT..."
-
-  rm -rf roc-src
-  git init roc-src
-  cd roc-src
-  git remote add origin https://github.com/roc-lang/roc
-  git fetch --depth 1 origin "$ROC_COMMIT"
-  git checkout --detach "$ROC_COMMIT"
-
-  # Retry zig build up to 3 times (Zig package fetches can be flaky in CI)
-  for attempt in 1 2 3; do
-    echo "zig build roc (attempt $attempt)..."
-    if zig build roc; then
-      break
-    fi
-    if [ $attempt -eq 3 ]; then
-      echo "zig build roc failed after 3 attempts"
-      exit 1
-    fi
-    echo "Retrying in 10 seconds..."
-    sleep 10
-  done
-
-  # Add to GITHUB_PATH if running in CI
-  if [ -n "${GITHUB_PATH:-}" ]; then
-    echo "$(pwd)/zig-out/bin" >> "$GITHUB_PATH"
-  fi
-
-  cd ..
-fi
-
-# Ensure roc-src build is in PATH (harmless if dir doesn't exist)
-export PATH="$(pwd)/roc-src/zig-out/bin:$PATH"
-
-echo ""
-echo "Using roc version: $(roc version)"
+echo "Using $(roc version)"
 
 FAILED=0
 
@@ -309,6 +247,7 @@ create_native_bundle() {
   mkdir -p "$platform_dir"
 
   cp platform/Stderr.roc "$platform_dir/"
+  cp platform/Host.roc "$platform_dir/"
   cp platform/Stdin.roc "$platform_dir/"
   cp platform/Stdout.roc "$platform_dir/"
   write_native_target_platform_main "$native_target" "$platform_dir/main.roc"

@@ -1,3 +1,8 @@
+[![Roc-Lang][roc_badge]][roc_link]
+
+[roc_badge]: https://img.shields.io/endpoint?url=https%3A%2F%2Fpastebin.com%2Fraw%2FcFzuCCd7
+[roc_link]: https://github.com/roc-lang/roc
+
 # Roc platform template for Rust
 
 A template for building [Roc platforms](https://www.roc-lang.org/platforms) using [Rust](https://www.rust-lang.org).
@@ -5,19 +10,31 @@ A template for building [Roc platforms](https://www.roc-lang.org/platforms) usin
 ## Requirements
 
 - [Rust](https://rustup.rs/) (stable)
-- [Roc](https://www.roc-lang.org/) (built from the commit pinned in `.roc-version`)
+- [Roc](https://www.roc-lang.org/) on `PATH`
 
 ## Examples
 
-The checked-in examples use the latest released platform bundle:
+The examples in this repo use the local platform at `../platform/main.roc`.
 
-```roc
-platform "https://github.com/lukewilliamboswell/roc-platform-template-rust/releases/download/0.4/3q9Kou2yUcPovfn1NhRrsvtcdfHUWmzyCaGwiupYFXUk.tar.zst"
+For apps outside this repo, build a bundle from this checkout and use that generated bundle URL or file path as the platform dependency. The latest published release bundle may not match the current platform API.
+
+```bash
+./bundle.sh
 ```
 
 Run examples with interpreter: `roc examples/<name>.roc`
 
 Build standalone executable: `roc build examples/<name>.roc`
+
+## Documentation
+
+Platform API docs are published at <https://lukewilliamboswell.github.io/roc-platform-template-rust/>.
+
+Generate docs locally:
+
+```bash
+roc docs platform/main.roc --output=generated-docs --no-cache
+```
 
 ## Building
 
@@ -37,7 +54,7 @@ When the platform API changes (e.g. adding or modifying hosted functions in `pla
 roc glue <path-to>/RustGlue.roc ./src/ platform/main.roc
 ```
 
-This overwrites `src/roc_platform_abi.rs` with updated type definitions and dispatch tables.
+This overwrites `src/roc_platform_abi.rs` with updated type definitions and hosted symbol signatures.
 
 ## Bundling
 
@@ -53,7 +70,7 @@ This creates a `.tar.zst` bundle containing all `.roc` files and prebuilt host l
 bash ci/all_tests.sh
 ```
 
-This builds the platform and runs all examples. If `roc` is already on your PATH at the pinned commit, it will be used directly; otherwise it will be built from source.
+This builds the platform and runs all examples using `roc` from your local `PATH`.
 
 The script also creates a native-target platform bundle, serves it over localhost, rewrites temporary copies of the examples to use that package URL, and runs the examples again against the bundled package.
 
@@ -85,4 +102,4 @@ This platform exposes:
 - `Stderr.line!` - Print a line to stderr
 - `Stdin.line!` - Read a line from stdin
 
-The main function receives command-line arguments as `List(Str)` and returns `Try({}, [Exit(I32)])`.
+The main function receives command-line arguments as `List(Str)` and returns `Try({}, [Exit(I32), ..])`.

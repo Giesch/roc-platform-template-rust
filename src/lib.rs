@@ -4,77 +4,140 @@
 
 use std::ffi::c_void;
 use std::io::{self, BufRead, Write};
+use std::mem::ManuallyDrop;
 
 mod roc_platform_abi;
 
 use crate::roc_platform_abi::{
-    make_roc_ops, DefaultAllocators, DefaultHandlers, HostedFunctions, RocList, RocOps, RocStr,
+    make_roc_host, roc_main, DefaultAllocators, DefaultHandlers, HostStderrLineResult,
+    HostStderrLineResultPayload, HostStderrLineResultTag, HostStdinLineResult,
+    HostStdinLineResultPayload, HostStdinLineResultTag, HostStdoutLineResult,
+    HostStdoutLineResultPayload, HostStdoutLineResultTag, RocHost, RocList, RocStr,
 };
 
-// External symbol provided by the compiled Roc application
-extern "C" {
-    fn roc_main(args: RocList<RocStr>) -> i32;
-}
+static mut ROC_HOST: *mut RocHost = core::ptr::null_mut();
 
-static mut ROC_OPS: *mut RocOps = core::ptr::null_mut();
-
-fn set_roc_ops(roc_ops: *mut RocOps) {
+fn set_roc_host(roc_host: *mut RocHost) {
     unsafe {
-        ROC_OPS = roc_ops;
+        ROC_HOST = roc_host;
     }
 }
 
-fn roc_ops_ptr() -> *mut RocOps {
+fn roc_host_ptr() -> *mut RocHost {
     unsafe {
-        if ROC_OPS.is_null() {
-            eprintln!("roc host error: RocOps not initialized");
+        if ROC_HOST.is_null() {
+            eprintln!("roc host error: RocHost not initialized");
             std::process::exit(1);
         }
-        ROC_OPS
+        ROC_HOST
     }
 }
 
-fn roc_ops() -> &'static RocOps {
-    unsafe { &*roc_ops_ptr() }
+fn roc_host() -> &'static RocHost {
+    unsafe { &*roc_host_ptr() }
 }
 
-/// Hosted function: Stderr.line!
-#[no_mangle]
-pub extern "C" fn roc_stderr_line(message: RocStr) {
-    let _ = writeln!(io::stderr(), "{}", message.as_str());
-    message.decref(roc_ops());
+fn stderr_line_ok() -> HostStderrLineResult {
+    HostStderrLineResult {
+        payload: HostStderrLineResultPayload {
+            ok: ManuallyDrop::new(()),
+        },
+        tag: HostStderrLineResultTag::Ok,
+    }
 }
 
-/// Hosted function: Stdin.line!
+fn stderr_line_err(err: impl std::fmt::Display) -> HostStderrLineResult {
+    HostStderrLineResult {
+        payload: HostStderrLineResultPayload {
+            err: ManuallyDrop::new(RocStr::from_str(&err.to_string(), roc_host())),
+        },
+        tag: HostStderrLineResultTag::Err,
+    }
+}
+
+fn stdin_line_ok(line: RocStr) -> HostStdinLineResult {
+    HostStdinLineResult {
+        payload: HostStdinLineResultPayload {
+            ok: ManuallyDrop::new(line),
+        },
+        tag: HostStdinLineResultTag::Ok,
+    }
+}
+
+fn stdin_line_err(err: impl std::fmt::Display) -> HostStdinLineResult {
+    HostStdinLineResult {
+        payload: HostStdinLineResultPayload {
+            err: ManuallyDrop::new(RocStr::from_str(&err.to_string(), roc_host())),
+        },
+        tag: HostStdinLineResultTag::Err,
+    }
+}
+
+fn stdout_line_ok() -> HostStdoutLineResult {
+    HostStdoutLineResult {
+        payload: HostStdoutLineResultPayload {
+            ok: ManuallyDrop::new(()),
+        },
+        tag: HostStdoutLineResultTag::Ok,
+    }
+}
+
+fn stdout_line_err(err: impl std::fmt::Display) -> HostStdoutLineResult {
+    HostStdoutLineResult {
+        payload: HostStdoutLineResultPayload {
+            err: ManuallyDrop::new(RocStr::from_str(&err.to_string(), roc_host())),
+        },
+        tag: HostStdoutLineResultTag::Err,
+    }
+}
+
+/// Hosted function: Host.stderr_line!
 #[no_mangle]
-pub extern "C" fn roc_stdin_line() -> RocStr {
+pub extern "C" fn roc_stderr_line(message: RocStr) -> HostStderrLineResult {
+    let result = writeln!(io::stderr(), "{}", message.as_str());
+    message.decref(roc_host());
+
+    match result {
+        Ok(()) => stderr_line_ok(),
+        Err(err) => stderr_line_err(err),
+    }
+}
+
+/// Hosted function: Host.stdin_line!
+#[no_mangle]
+pub extern "C" fn roc_stdin_line() -> HostStdinLineResult {
     let stdin = io::stdin();
     let mut line = String::new();
 
     match stdin.lock().read_line(&mut line) {
         Ok(_) => {
             let trimmed = line.trim_end_matches('\n').trim_end_matches('\r');
-            RocStr::from_str(trimmed, roc_ops())
+            stdin_line_ok(RocStr::from_str(trimmed, roc_host()))
         }
-        Err(_) => RocStr::empty(),
+        Err(err) => stdin_line_err(err),
     }
 }
 
-/// Hosted function: Stdout.line!
+/// Hosted function: Host.stdout_line!
 #[no_mangle]
-pub extern "C" fn roc_stdout_line(message: RocStr) {
-    let _ = writeln!(io::stdout(), "{}", message.as_str());
-    message.decref(roc_ops());
+pub extern "C" fn roc_stdout_line(message: RocStr) -> HostStdoutLineResult {
+    let result = writeln!(io::stdout(), "{}", message.as_str());
+    message.decref(roc_host());
+
+    match result {
+        Ok(()) => stdout_line_ok(),
+        Err(err) => stdout_line_err(err),
+    }
 }
 
 #[no_mangle]
 pub extern "C" fn roc_alloc(length: usize, alignment: usize) -> *mut c_void {
-    DefaultAllocators::roc_alloc(roc_ops_ptr(), length, alignment)
+    DefaultAllocators::roc_alloc(roc_host_ptr(), length, alignment)
 }
 
 #[no_mangle]
 pub extern "C" fn roc_dealloc(ptr: *mut c_void, alignment: usize) {
-    DefaultAllocators::roc_dealloc(roc_ops_ptr(), ptr, alignment);
+    DefaultAllocators::roc_dealloc(roc_host_ptr(), ptr, alignment);
 }
 
 #[no_mangle]
@@ -83,36 +146,36 @@ pub extern "C" fn roc_realloc(
     new_length: usize,
     alignment: usize,
 ) -> *mut c_void {
-    DefaultAllocators::roc_realloc(roc_ops_ptr(), ptr, new_length, alignment)
+    DefaultAllocators::roc_realloc(roc_host_ptr(), ptr, new_length, alignment)
 }
 
 #[no_mangle]
 pub extern "C" fn roc_dbg(bytes: *const u8, len: usize) {
-    DefaultHandlers::roc_dbg(roc_ops_ptr(), bytes, len);
+    DefaultHandlers::roc_dbg(roc_host_ptr(), bytes, len);
 }
 
 #[no_mangle]
 pub extern "C" fn roc_expect_failed(bytes: *const u8, len: usize) {
-    DefaultHandlers::roc_expect_failed(roc_ops_ptr(), bytes, len);
+    DefaultHandlers::roc_expect_failed(roc_host_ptr(), bytes, len);
 }
 
 #[no_mangle]
 pub extern "C" fn roc_crashed(bytes: *const u8, len: usize) {
-    DefaultHandlers::roc_crashed(roc_ops_ptr(), bytes, len);
+    DefaultHandlers::roc_crashed(roc_host_ptr(), bytes, len);
 }
 
 /// Build a RocList<RocStr> from command-line arguments.
-fn build_args_list(roc_ops: &RocOps) -> RocList<RocStr> {
+fn build_args_list(roc_host: &RocHost) -> RocList<RocStr> {
     let args: Vec<String> = std::env::args().collect();
 
     if args.is_empty() {
         return RocList::empty();
     }
 
-    let list = RocList::<RocStr>::allocate(args.len(), roc_ops);
+    let list = RocList::<RocStr>::allocate(args.len(), roc_host);
     let elements = list.elements;
     for (i, arg) in args.iter().enumerate() {
-        let roc_str = RocStr::from_str(arg, roc_ops);
+        let roc_str = RocStr::from_str(arg, roc_host);
         unsafe {
             elements.add(i).write(roc_str);
         }
@@ -129,17 +192,12 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const i8) -> i32 {
 
 /// Main entry point for the Roc program.
 pub fn rust_main() -> i32 {
-    let hosted_fns = HostedFunctions {
-        count: 0,
-        fns: core::ptr::null(),
-    };
+    let mut roc_host = make_roc_host(core::ptr::null_mut());
+    set_roc_host(&mut roc_host);
 
-    let mut roc_ops = make_roc_ops(core::ptr::null_mut(), hosted_fns);
-    set_roc_ops(&mut roc_ops);
-
-    let args_list = build_args_list(&roc_ops);
+    let args_list = build_args_list(&roc_host);
 
     let exit_code = unsafe { roc_main(args_list) };
-    set_roc_ops(core::ptr::null_mut());
+    set_roc_host(core::ptr::null_mut());
     exit_code
 }
