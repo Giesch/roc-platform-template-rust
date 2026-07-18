@@ -368,14 +368,14 @@ if [ "${RUN_LOCAL_TESTS:-1}" = "1" ]; then
     echo "=== Skipping platform build (SKIP_BUILD=1) ==="
   fi
 
-  temp_root=""
-  temp_parent="${TMPDIR:-/tmp}"
-  temp_parent="${temp_parent%/}"
-  temp_root=$(mktemp -d "$temp_parent/platform-template-local-tests.XXXXXX")
+  # Relative platform paths are resolved relative to the app file, and absolute
+  # paths are rejected by roc, so the rewritten examples must live at a stable
+  # location inside the repo.
+  temp_root=$(mktemp -d "$(pwd)/.local-platform-tests.XXXXXX")
   TEMP_DIRS+=("$temp_root")
 
   local_examples_dir="$temp_root/examples"
-  copy_examples_for_platform_ref "$(pwd)/platform/main.roc" "$local_examples_dir"
+  copy_examples_for_platform_ref "../../platform/main.roc" "$local_examples_dir"
   run_suite "$local_examples_dir" "$local_examples_dir" "local platform"
 else
   echo ""

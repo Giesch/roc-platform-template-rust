@@ -31,6 +31,9 @@ roc-src/
 *.tar.gz
 *.tar.zst
 
+# Local test temp dirs created by ci/all_tests.sh
+.local-platform-tests.*/
+
 # OS files
 .DS_Store
 
