@@ -13,6 +13,16 @@ path = "src/main.rs"
 
 [dependencies]
 
+[lints.rust]
+# The generated glue (src/roc_platform_abi.rs) guards its std-based default
+# allocators/handlers with a custom `no_roc_std_helpers` cfg so hosts can opt
+# out via RUSTFLAGS. Rust's check-cfg lint warns on any cfg name the crate
+# doesn't declare; the warnings are benign (the defaults compile in as
+# intended), and only the consuming crate can declare the cfg — the glue
+# generator can't do it from within the file it emits. So we declare it here.
+# NOTE: this can be removed after a related change to RustGlue, to allow unrecognized cfgs
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(no_roc_std_helpers)'] }
+
 [profile.release]
 lto = true
 strip = "debuginfo"

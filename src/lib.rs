@@ -39,9 +39,7 @@ fn roc_host() -> &'static RocHost {
 
 fn stderr_line_ok() -> HostStderrLineResult {
     HostStderrLineResult {
-        payload: HostStderrLineResultPayload {
-            ok: ManuallyDrop::new(()),
-        },
+        payload: HostStderrLineResultPayload { ok: [] },
         tag: HostStderrLineResultTag::Ok,
     }
 }
@@ -75,9 +73,7 @@ fn stdin_line_err(err: impl std::fmt::Display) -> HostStdinLineResult {
 
 fn stdout_line_ok() -> HostStdoutLineResult {
     HostStdoutLineResult {
-        payload: HostStdoutLineResultPayload {
-            ok: ManuallyDrop::new(()),
-        },
+        payload: HostStdoutLineResultPayload { ok: [] },
         tag: HostStdoutLineResultTag::Ok,
     }
 }
@@ -95,7 +91,8 @@ fn stdout_line_err(err: impl std::fmt::Display) -> HostStdoutLineResult {
 #[no_mangle]
 pub extern "C" fn roc_stderr_line(message: RocStr) -> HostStderrLineResult {
     let result = writeln!(io::stderr(), "{}", message.as_str());
-    message.decref(roc_host());
+    // Safety: the hosted function owns `message` and this is its only decref.
+    unsafe { message.decref(roc_host()) };
 
     match result {
         Ok(()) => stderr_line_ok(),
@@ -122,7 +119,8 @@ pub extern "C" fn roc_stdin_line() -> HostStdinLineResult {
 #[no_mangle]
 pub extern "C" fn roc_stdout_line(message: RocStr) -> HostStdoutLineResult {
     let result = writeln!(io::stdout(), "{}", message.as_str());
-    message.decref(roc_host());
+    // Safety: the hosted function owns `message` and this is its only decref.
+    unsafe { message.decref(roc_host()) };
 
     match result {
         Ok(()) => stdout_line_ok(),
@@ -172,7 +170,9 @@ fn build_args_list(roc_host: &RocHost) -> RocList<RocStr> {
         return RocList::empty();
     }
 
-    let list = RocList::<RocStr>::allocate(args.len(), roc_host);
+    // Safety: every element is initialized by the loop below before the list
+    // is exposed to Roc.
+    let list = unsafe { RocList::<RocStr>::allocate(args.len(), roc_host) };
     let elements = list.elements;
     for (i, arg) in args.iter().enumerate() {
         let roc_str = RocStr::from_str(arg, roc_host);
