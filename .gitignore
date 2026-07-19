@@ -2,9 +2,6 @@
 target/
 generated-docs/
 
-# Local Roc source checkouts
-roc-src/
-
 # Platform binaries (but not musl runtime files)
 *.so
 *.dylib

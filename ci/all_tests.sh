@@ -135,7 +135,7 @@ run_roc_tests() {
         FAILED=1
       fi
     fi
-  done < <(find "$test_root" -type d -name "roc-src" -prune -o -type f -name "*.roc" -print)
+  done < <(find "$test_root" -type f -name "*.roc" -print)
 }
 
 run_suite() {
